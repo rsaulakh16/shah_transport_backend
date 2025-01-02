@@ -1,14 +1,14 @@
-const { Driver, DriverDetails } = require('../models');
-const { generateOtp, generateAuthToken } = require('../utils/helpers');
-const { sendEmail } = require('../services/brevoService');
-const jwt = require('jsonwebtoken');
+const { Driver, DriverDetails } = require("../models");
+const { generateOtp, generateAuthToken } = require("../utils/helpers");
+const { sendEmail } = require("../services/brevoService");
+const jwt = require("jsonwebtoken");
 
 // 1. Send OTP
 exports.sendOtp = async (req, res) => {
   const { email } = req.body;
 
   if (!email) {
-    return res.status(400).json({ message: 'Email is required.' });
+    return res.status(400).json({ message: "Email is required." });
   }
 
   try {
@@ -28,14 +28,14 @@ exports.sendOtp = async (req, res) => {
     // Send OTP via Brevo
     await sendEmail({
       to: email,
-      subject: 'Your OTP Code',
+      subject: "Your OTP Code",
       htmlContent: `<p>Your OTP is <strong>${otp}</strong>. It will expire in 10 minutes.</p>`,
     });
 
-    res.json({ message: 'OTP sent successfully.' });
+    res.json({ message: "OTP sent successfully." });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Failed to send OTP.' });
+    res.status(500).json({ message: "Failed to send OTP." });
   }
 };
 
@@ -44,27 +44,35 @@ exports.verifyOtp = async (req, res) => {
   const { email, otp } = req.body;
 
   if (!email || !otp) {
-    return res.status(400).json({ message: 'Email and OTP are required.' });
+    return res.status(400).json({ message: "Email and OTP are required." });
   }
 
   try {
     const driver = await Driver.findOne({ where: { email } });
 
     if (!driver) {
-      return res.status(404).json({ message: 'Driver not found.' });
+      return res.status(404).json({ message: "Driver not found." });
     }
 
     if (driver.otp !== otp || driver.otp_expires_at < new Date()) {
-      return res.status(400).json({ message: 'Invalid or expired OTP.' });
+      return res.status(400).json({ message: "Invalid or expired OTP." });
     }
 
-    await driver.update({ email_verified: true, otp: null, otp_expires_at: null });
+    await driver.update({
+      email_verified: true,
+      otp: null,
+      otp_expires_at: null,
+    });
 
     const authToken = generateAuthToken(driver.id);
-    res.json({ authToken });
+    res.json({
+      data: {driver, authToken},
+      success: true,
+      message: "Email Verified Successfully",
+    });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Failed to verify OTP.' });
+    res.status(500).json({ message: "Failed to verify OTP." });
   }
 };
 
@@ -73,7 +81,9 @@ exports.saveDriverDetails = async (req, res) => {
   const { authToken, driverDetails } = req.body;
 
   if (!authToken) {
-    return res.status(401).json({ message: 'Authentication token is required.' });
+    return res
+      .status(401)
+      .json({ message: "Authentication token is required." });
   }
 
   try {
@@ -83,21 +93,67 @@ exports.saveDriverDetails = async (req, res) => {
     const driver = await Driver.findByPk(driverId);
 
     if (!driver) {
-      return res.status(404).json({ message: 'Driver not found.' });
+      return res.status(404).json({ message: "Driver not found." });
     }
 
     if (!driver.email_verified) {
-      return res.status(403).json({ message: 'Email not verified.' });
+      return res.status(403).json({ message: "Email not verified." });
     }
 
-    const savedDetails = await DriverDetails.create({
-      driverId,
-      ...driverDetails,
+    // Check if DriverDetails already exists for the driver
+    const existingDetails = await DriverDetails.findOne({
+      where: { driverId },
     });
 
-    res.json({ message: 'Details saved successfully.', savedDetails });
+    let savedDetails;
+    if (existingDetails) {
+      // Update existing record
+      savedDetails = await existingDetails.update(driverDetails);
+      await driver.update({ application_status: 0 });
+      res.json({ message: "Details updated successfully.", savedDetails });
+    } else {
+      // Create new record
+      savedDetails = await DriverDetails.create({
+        driverId,
+        ...driverDetails,
+      });
+      await driver.update({ application_status: 0 });
+      sendDriverDetailsEmail(driver, savedDetails);
+      res.json({ message: "Details saved successfully.", savedDetails });
+    }
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Failed to save details.' });
+    res.status(500).json({ message: "Failed to save details." });
   }
 };
+
+
+async function sendDriverDetailsEmail(driver, savedDetails) {
+  try {
+    const driverEmail = driver.email;
+
+    // Format the driver details into an HTML table
+    const table = `
+      <table  cellpadding="5" cellspacing="0">
+        
+        <tbody>
+          <tr><td><strong>Name</strong></td><td>${savedDetails.name}</td><td></td><td><strong>Email</strong></td><td>${driver.email}</td></tr>
+          <tr><td><strong>Phone Number</strong></td><td>${savedDetails.phone_number}</td><td></td><td><strong>Sex</strong></td><td>${savedDetails.sex}</td></tr>
+          <tr><td><strong>Marital Status</strong></td><td>${savedDetails.marital_status}</td><td></td><td><strong>Number of dependents</strong></td><td>${savedDetails.number_of_dependents}</td></tr>
+          <tr><td><strong>License Number</strong></td><td>${savedDetails.license_number}</td><td></td><td><strong>SIN#</strong></td><td>${savedDetails.sin}</td></tr>
+        </tbody>
+      </table>
+    `;
+
+    // Send the email
+    await sendEmail({
+      to: "shahtransport@yopmail.com",  // Send to admin or any other relevant email
+      subject: "New Driver Details Submitted",
+      htmlContent: `<p><strong>Driver Details:</strong></p>${table}`,
+    });
+
+    console.log("Driver details email sent successfully.");
+  } catch (error) {
+    console.error("Failed to send email with driver details:", error);
+  }
+}

@@ -3,10 +3,11 @@ const dotenv = require('dotenv');
 const driverRoutes = require('./routes/DeiverRoutes');
 const userRoutes = require('./routes/userRoutes');
 const { sequelize } = require('./models'); // Import Sequelize instance
+const cors = require("cors");
 
 dotenv.config();
-
 const app = express();
+app.use(cors({origin: "*"}));
 
 app.use(express.json());
 
