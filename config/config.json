@@ -1,0 +1,23 @@
+{
+  "development": {
+    "username": "postgres",
+    "password": "mrtech",
+    "database": "shah_transport",
+    "host": "127.0.0.1",
+    "dialect": "postgres"
+  },
+  "test": {
+    "username": "postgres",
+    "password": "mrtech",
+    "database": "shah_transport",
+    "host": "127.0.0.1",
+    "dialect": "postgres"
+  },
+  "production": {
+    "username": "mrtechne_roop",
+    "password": "nIY%-0(Q3i_v",
+    "database": "mrtechne_shah_transport",
+    "host": "127.0.0.200",
+    "dialect": "postgres"
+  }
+}
