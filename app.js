@@ -1,6 +1,7 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const driverRoutes = require('./routes/DeiverRoutes');
+const userRoutes = require('./routes/userRoutes');
 const { sequelize } = require('./models'); // Import Sequelize instance
 
 dotenv.config();
@@ -26,7 +27,7 @@ const startServer = async () => {
 
   const PORT = process.env.PORT || 3000;
   app.use('/api/driver', driverRoutes);
-
+  app.use('/api/user', userRoutes);
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
   });
