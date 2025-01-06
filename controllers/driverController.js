@@ -1,7 +1,14 @@
-const { Driver, DriverDetails } = require("../models");
+const {
+  Driver,
+  DriverDetails,
+  EmploymentHistory,
+  EmergencyContact,
+  Questionnaire,
+} = require("../models");
 const { generateOtp, generateAuthToken } = require("../utils/helpers");
 const { sendEmail } = require("../services/brevoService");
 const jwt = require("jsonwebtoken");
+const { formEmailTemplate } = require("../utils/formEmail");
 
 // 1. Send OTP
 exports.sendOtp = async (req, res) => {
@@ -39,6 +46,43 @@ exports.sendOtp = async (req, res) => {
   }
 };
 
+// 1. update driver
+exports.submitForm = async (req, res) => {
+  const { authToken, data } = req.body;
+
+  if (!authToken) {
+    return res
+      .status(401)
+      .json({ message: "Authentication token is required." });
+  }
+
+  try {
+    const decoded = jwt.verify(authToken, process.env.JWT_SECRET);
+    const driverId = decoded.id;
+
+    const driver = await Driver.findByPk(driverId);
+
+    if (!driver) {
+      return res.status(404).json({ message: "Driver not found." });
+    }
+
+    if (!driver.email_verified) {
+      return res.status(403).json({ message: "Email not verified." });
+    }
+
+    let savedDetails = await driver.update({
+      application_status: "DONE",
+      agreedAllPolicies: true,
+      isViewed: true,
+    });
+    sendDriverDetailsEmail(driverId);
+    res.json({ message: "Form Submitted Successfuly", savedDetails });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to save details." });
+  }
+};
+
 // 2. Verify OTP
 exports.verifyOtp = async (req, res) => {
   const { email, otp } = req.body;
@@ -66,7 +110,7 @@ exports.verifyOtp = async (req, res) => {
 
     const authToken = generateAuthToken(driver.id);
     res.json({
-      data: {driver, authToken},
+      data: { driver, authToken },
       success: true,
       message: "Email Verified Successfully",
     });
@@ -118,7 +162,6 @@ exports.saveDriverDetails = async (req, res) => {
         ...driverDetails,
       });
       await driver.update({ application_status: 0 });
-      sendDriverDetailsEmail(driver, savedDetails);
       res.json({ message: "Details saved successfully.", savedDetails });
     }
   } catch (error) {
@@ -127,29 +170,184 @@ exports.saveDriverDetails = async (req, res) => {
   }
 };
 
+// 4. Save Employment History
+exports.saveEmploymentHistory = async (req, res) => {
+  const { authToken, employmentHistory } = req.body;
+  console.log("employmentHistory", employmentHistory);
+  if (!authToken) {
+    return res
+      .status(401)
+      .json({ message: "Authentication token is required." });
+  }
 
-async function sendDriverDetailsEmail(driver, savedDetails) {
   try {
-    const driverEmail = driver.email;
+    const decoded = jwt.verify(authToken, process.env.JWT_SECRET);
+    console.log("decoded", decoded);
+    const driverId = decoded.id;
 
+    const driver = await Driver.findByPk(driverId);
+
+    if (!driver) {
+      return res.status(404).json({ message: "Driver not found." });
+    }
+
+    if (!driver.email_verified) {
+      return res.status(403).json({ message: "Email not verified." });
+    }
+
+    // Check if DriverDetails already exists for the driver
+    const existingDetails = await EmploymentHistory.findOne({
+      where: { driverId },
+    });
+
+    let savedDetails;
+    if (existingDetails) {
+      // Update existing record
+      savedDetails = await existingDetails.update(employmentHistory);
+      await driver.update({ application_status: 1 });
+      res.json({ message: "Details updated successfully.", savedDetails });
+    } else {
+      // Create new record
+      savedDetails = await EmploymentHistory.create({
+        driverId,
+        employmentHistory,
+      });
+      await driver.update({ application_status: 0 });
+      res.json({ message: "Details saved successfully.", savedDetails });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to save details." + error });
+  }
+};
+// 4. Save Employment History
+exports.saveEmergencyContacts = async (req, res) => {
+  const { authToken, emergencyContacts } = req.body;
+
+  if (!authToken) {
+    return res
+      .status(401)
+      .json({ message: "Authentication token is required." });
+  }
+
+  try {
+    const decoded = jwt.verify(authToken, process.env.JWT_SECRET);
+    const driverId = decoded.id;
+
+    const driver = await Driver.findByPk(driverId);
+
+    if (!driver) {
+      return res.status(404).json({ message: "Driver not found." });
+    }
+
+    if (!driver.email_verified) {
+      return res.status(403).json({ message: "Email not verified." });
+    }
+
+    // Check if DriverDetails already exists for the driver
+    const existingDetails = await EmergencyContact.findOne({
+      where: { driverId },
+    });
+
+    let savedDetails;
+    if (existingDetails) {
+      // Update existing record
+      savedDetails = await existingDetails.update(emergencyContacts);
+      await driver.update({ application_status: 0 });
+      res.json({ message: "Details updated successfully.", savedDetails });
+    } else {
+      // Create new record
+      savedDetails = await EmergencyContact.create({
+        driverId,
+        emergencyContacts,
+      });
+      await driver.update({ application_status: 2 });
+      res.json({ message: "Details saved successfully.", savedDetails });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to save details." });
+  }
+};
+
+// 5. Driver questions Details
+exports.saveQuestions = async (req, res) => {
+  const { authToken, questions } = req.body;
+
+  if (!authToken) {
+    return res
+      .status(401)
+      .json({ message: "Authentication token is required." });
+  }
+
+  try {
+    const decoded = jwt.verify(authToken, process.env.JWT_SECRET);
+    const driverId = decoded.id;
+
+    const driver = await Driver.findByPk(driverId);
+
+    if (!driver) {
+      return res.status(404).json({ message: "Driver not found." });
+    }
+
+    if (!driver.email_verified) {
+      return res.status(403).json({ message: "Email not verified." });
+    }
+
+    // Check if DriverDetails already exists for the driver
+    const existingDetails = await Questionnaire.findOne({
+      where: { driverId },
+    });
+
+    let savedDetails;
+    if (existingDetails) {
+      // Update existing record
+      savedDetails = await existingDetails.update(questions);
+      await driver.update({ application_status: 3 });
+      res.json({ message: "Details updated successfully.", savedDetails });
+    } else {
+      // Create new record
+      savedDetails = await Questionnaire.create({
+        driverId,
+        questions,
+      });
+      await driver.update({ application_status: 0 });
+      res.json({ message: "Details saved successfully.", savedDetails });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to save details." });
+  }
+};
+
+async function sendDriverDetailsEmail(driverId) {
+  try {
+    const driver = await Driver.findByPk(driverId);
+    const personalDetails = await DriverDetails.findOne({
+      where: { driverId },
+    });
+
+    const employmentHistory = await EmploymentHistory.findOne({
+      where: { driverId },
+    });
+    const questions = await Questionnaire.findOne({
+      where: { driverId },
+    });
+    const emergencyContact = await EmergencyContact.findOne({
+      where: { driverId },
+    });
     // Format the driver details into an HTML table
-    const table = `
-      <table  cellpadding="5" cellspacing="0">
-        
-        <tbody>
-          <tr><td><strong>Name</strong></td><td>${savedDetails.name}</td><td></td><td><strong>Email</strong></td><td>${driver.email}</td></tr>
-          <tr><td><strong>Phone Number</strong></td><td>${savedDetails.phone_number}</td><td></td><td><strong>Sex</strong></td><td>${savedDetails.sex}</td></tr>
-          <tr><td><strong>Marital Status</strong></td><td>${savedDetails.marital_status}</td><td></td><td><strong>Number of dependents</strong></td><td>${savedDetails.number_of_dependents}</td></tr>
-          <tr><td><strong>License Number</strong></td><td>${savedDetails.license_number}</td><td></td><td><strong>SIN#</strong></td><td>${savedDetails.sin}</td></tr>
-        </tbody>
-      </table>
-    `;
-
     // Send the email
     await sendEmail({
-      to: "shahtransport@yopmail.com",  // Send to admin or any other relevant email
+      to: "shahtransport@yopmail.com", // Send to admin or any other relevant email
       subject: "New Driver Details Submitted",
-      htmlContent: `<p><strong>Driver Details:</strong></p>${table}`,
+      htmlContent: await formEmailTemplate(
+        driver,
+        personalDetails,
+        employmentHistory,
+        emergencyContact,
+        questions
+      ),
     });
 
     console.log("Driver details email sent successfully.");
