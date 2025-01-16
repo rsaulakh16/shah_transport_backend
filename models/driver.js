@@ -5,9 +5,14 @@ module.exports = (sequelize, DataTypes) => {
   class Driver extends Model {
     static associate(models) {
       // Association with DriverDetails
-      this.hasMany(models.DriverDetails, {
+      this.hasOne(models.DriverDetails, {
         foreignKey: "driverId",
         as: "details",
+        onDelete: "CASCADE",
+      });
+      this.hasMany(models.Questionnaire, {
+        foreignKey: "driverId",
+        as: "questions",
         onDelete: "CASCADE",
       });
     }

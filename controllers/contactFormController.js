@@ -28,7 +28,10 @@ exports.createContactForm = async (req, res) => {
 exports.getAllContactForms = async (req, res) => {
   try {
     const contactForms = await ContactForm.findAll();
-    res.status(200).json(contactForms);
+    res.status(200).json({
+      message: 'Contact forms fetched successfully',
+      data: contactForms,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to retrieve contact forms' });
