@@ -3,22 +3,22 @@ const { Umzug, SequelizeStorage } = require("umzug");
 const path = require("path");
 
 (async () => {
-  const sequelize = new Sequelize({
-    username: 'postgres',
-    password: 'mrtech',
-    database: 'shah_transport',
-    host: '127.0.0.1',
-    dialect: 'postgres',
-    logging: console.log, // Log SQL queries for debugging
-  });
   // const sequelize = new Sequelize({
-  //   username: "mrtechne_roop",
-  //   password: "nIY%-0(Q3i_v",
-  //   database: "mrtechne_shah_transport",
-  //   host: "127.0.0.200",
-  //   dialect: "postgres",
+  //   username: 'postgres',
+  //   password: 'mrtech',
+  //   database: 'shah_transport',
+  //   host: '127.0.0.1',
+  //   dialect: 'postgres',
   //   logging: console.log, // Log SQL queries for debugging
   // });
+  const sequelize = new Sequelize({
+    username: "mrtechne_roop",
+    password: "nIY%-0(Q3i_v",
+    database: "mrtechne_shah_transport",
+    host: "168.119.43.146",
+    dialect: "postgres",
+    logging: console.log, // Log SQL queries for debugging
+  });
 
   const umzug = new Umzug({
     migrations: {
